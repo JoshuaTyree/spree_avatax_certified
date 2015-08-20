@@ -66,13 +66,11 @@ module Spree
     def tax_for_item(item, avalara_response)
       order = item.order
       item_address = order.ship_address || order.billing_address
-      if item_address.nil?
-        # We can't calculate tax when we don't have a destination address
-        return 0
-      elsif !self.calculable.zone.include?(item_address)
-        # If the order is outside our jurisdiction, then return 0
-        return 0
-      end
+
+      return 0 if order.state == %w(address cart)
+      return 0 if item_address.nil?
+      return 0 if !self.calculable.zone.include?(item_address)
+
       avalara_response['TaxLines'].each do |line|
         if line['LineNo'] == "#{item.id}-#{item.avatax_line_code}"
           return line['TaxCalculated'].to_f
