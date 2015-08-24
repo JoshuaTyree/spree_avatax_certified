@@ -17,7 +17,7 @@ Spree::Order.class_eval do
 
   def avalara_lookup
     logger.debug 'avalara lookup'
-    create_avalara_transaction
+    create_avalara_transaction_order
     :lookup_avatax
   end
 
@@ -30,10 +30,10 @@ Spree::Order.class_eval do
     logger.debug 'avalara capture'
 
     begin
-      create_avalara_transaction
+      create_avalara_transaction_order
       line_items.reload
 
-      @rtn_tax = avalara_transaction.commit_avatax(line_items, self, number.to_s, Date.today.strftime('%F'), 'SalesInvoice')
+      @rtn_tax = avalara_transaction.commit_avatax(line_items, self, number.to_s, Date.today.strftime('%F'), transaction_doc_type)
 
       logger.info 'tax amount'
       logger.debug @rtn_tax
@@ -47,9 +47,9 @@ Spree::Order.class_eval do
   def avalara_capture_finalize
     logger.debug 'avalara capture finalize'
     begin
-      create_avalara_transaction
+      create_avalara_transaction_order
       line_items.reload
-      @rtn_tax = avalara_transaction.commit_avatax_final(line_items, self, number.to_s, Date.today.strftime('%F'), 'SalesInvoice')
+      @rtn_tax = avalara_transaction.commit_avatax_final(line_items, self, number.to_s, Date.today.strftime('%F'), transaction_doc_type)
 
       logger.info 'tax amount'
       logger.debug @rtn_tax
@@ -68,6 +68,28 @@ Spree::Order.class_eval do
   end
 
   private
+
+  def transaction_doc_type
+    if self.payment? || self.confirm? || self.completed?
+      'SalesInvoice'
+    else
+      'SalesOrder'
+    end
+  end
+
+  def create_avalara_transaction_order
+    Spree::AvalaraTransaction.create(order_id: self.id)
+  end
+
+  def assign_avalara_transaction
+    if avalara_eligible
+      if self.avalara_transaction.nil?
+        create_avalara_transaction_order
+      else
+        Spree::AvalaraTransaction.find_by_order_id(self.id).update_attributes(order_id: self.id)
+      end
+    end
+  end
 
   def logger
     @logger ||= AvataxHelper::AvataxLog.new('avalara_order', 'order class', 'start order processing')
