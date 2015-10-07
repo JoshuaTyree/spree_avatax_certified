@@ -9,15 +9,11 @@ module Spree
     end
 
     def compute_shipment_or_line_item(item)
+      # NEED TO TEST VAT
       if rate.included_in_price
         raise 'AvalaraTransaction cannot calculate inclusive sales taxes.'
       else
-
-        if item.order.state == 'complete'
-          avalara_response = item.order.avalara_capture
-        else
-          avalara_response = retrieve_rates_from_cache(item.order)
-        end
+        avalara_response = get_avalara_response(item.order)
 
         tax_for_item(item, avalara_response)
       end
@@ -35,6 +31,21 @@ module Spree
     end
 
     private
+
+    def get_avalara_response(order)
+      # when order is complete & no reimbursements
+      # when order is complete & has reimbursements
+      # when order is not complete
+      if order.state == 'complete' && order.reimbursements.empty?
+        order.avalara_capture
+      elsif order.state == 'complete' && !order.reimbursements.empty?
+        order.reimbursements.where("reimbursement_status != 'reimbursed'").each do |reimbursement|
+          return reimbursement.avalara_capture
+        end
+      else
+        retrieve_rates_from_cache(order)
+      end
+    end
 
     def cache_key(order)
       key = order.avatax_cache_key
@@ -75,6 +86,7 @@ module Spree
       return 0 if order.state == %w(address cart)
       return 0 if item_address.nil?
       return 0 if !self.calculable.zone.include?(item_address)
+      return 0 if avalara_response.try(:[], :TotalTax) == '0.00'
 
       avalara_response['TaxLines'].each do |line|
         if line['LineNo'] == "#{item.id}-#{item.avatax_line_code}"
