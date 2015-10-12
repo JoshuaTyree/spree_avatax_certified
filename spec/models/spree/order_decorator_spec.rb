@@ -66,10 +66,7 @@ describe Spree::Order, type: :model do
     before do
       @order.state = 'confirm'
     end
-    it 'should do avalara_capture' do
-      expect(@order).to receive(:avalara_capture_finalize)
-      @order.next!
-    end
+
     it 'should be at state complete' do
       @order.next!
       @order.should be_complete
