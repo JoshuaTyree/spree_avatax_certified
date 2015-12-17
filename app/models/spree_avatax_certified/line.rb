@@ -66,7 +66,7 @@ module SpreeAvataxCertified
 
       ship_lines = []
       order.shipments.each do |shipment|
-        next unless shipment.tax_category
+        next unless shipment.shipping_method and shipment.shipping_method.tax_category
         ship_lines << shipment_line(shipment)
       end
 
